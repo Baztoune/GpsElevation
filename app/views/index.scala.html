@@ -4,4 +4,14 @@
 
     @play20.welcome(message)
 
+    @helper.form(action = routes.Application.upload, 'enctype -> "multipart/form-data") {
+
+        <input type="file" name="picture">
+
+        <p>
+            <input type="submit">
+        </p>
+
+    }
+
 }

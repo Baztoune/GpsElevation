@@ -1,27 +1,58 @@
 package controllers
 
-import com.google.maps.model.LatLng
-import com.google.maps.{ElevationApi, GeoApiContext, GeocodingApi}
+import com.google.maps.model.{EncodedPolyline, LatLng}
+import com.google.maps.{ElevationApi, GeoApiContext}
+import play.api.Play
+import play.api.libs.iteratee.Enumerator
 import play.api.mvc._
+
+import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.io.Source
+import scala.math.BigDecimal.RoundingMode
 
 
 object Application extends Controller {
 
   def index = Action {
-
-    val SYDNEY = new LatLng(-33.867487, 151.206990)
-    val MELBOURNE = new LatLng(-37.814107, 144.963280)
-
-    val context = new GeoApiContext().setApiKey("AIzaSyAkQPEF_Wk3lFD6VnRaG-SyAQyHLd2jP9c")
-
-    val results = GeocodingApi.geocode(context, "1600 Amphitheatre Parkway Mountain View, CA 94043").await()
-    val results2 = ElevationApi.getByPoint(context, new LatLng(48.81635618944209,2.206782968924472)).await()
-    val results3 = ElevationApi.getByPoints(context, SYDNEY, MELBOURNE).await()
-
-    println(results2.elevation)
-    results3.foreach(p => println(s"${p.location.lat};${p.location.lat} => ${p.elevation}"))
-
     Ok(views.html.index("Your new application is ready."))
+  }
+
+  def upload = Action(parse.multipartFormData) { request =>
+    request.body.file("picture").map { picture =>
+      val context = new GeoApiContext().setApiKey(Play.current.configuration.getString("google.api.token").get)
+
+      val source = Source.fromFile(picture.ref.file)
+      source.getLines().next // skip first line
+      val points = source.getLines().map {
+        line => parseLineToLatLng(line)
+      }.toList
+
+      val results3 = ElevationApi.getByPoints(context, new EncodedPolyline(points.slice(0, 250).asJava)).await()
+
+      val a = Enumerator.enumerate(results3.map({
+        a => s"${a.location.lat};${a.location.lng};${a.elevation};${a.resolution}\n"
+      }))
+
+      Ok.chunked(a.andThen(Enumerator.eof)).withHeaders(
+        "Content-Type" -> "txt/plain",
+        "Content-Disposition" -> s"attachment; filename=elevation.txt"
+      )
+    }.get
+  }
+
+
+  def parseLineToLatLng(line: String): LatLng = {
+    val SEPARATOR = " "
+
+    val point = line.split(SEPARATOR)
+    new LatLng(parseFloat(point(0)), parseFloat(point(1)))
+  }
+
+  def parseFloat(s: String): Float = {
+    val SCALE = 4
+
+    BigDecimal(s.trim).setScale(SCALE, RoundingMode.DOWN).floatValue()
   }
 
 }

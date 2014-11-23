@@ -13,3 +13,5 @@ libraryDependencies ++= Seq(
   cache,
   ws
 )
+
+Keys.fork in Test := false
