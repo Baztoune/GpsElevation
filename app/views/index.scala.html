@@ -1,17 +1,44 @@
-@(message: String)
+@(input:Option[String], output:Option[String])
+<!DOCTYPE html>
 
-@main("Welcome to Play") {
+<html>
+<head>
+    <title>GPS Elevation</title>
+    <link rel="shortcut icon" href="@routes.Assets.at("images/favicon.png")" type="image/png">
 
-    @play20.welcome(message)
+    <link rel="stylesheet" href="@routes.Assets.at("lib/bootstrap/css/bootstrap.css")">
+    <link rel="stylesheet" href="@routes.Assets.at("stylesheets/main.css")">
+</head>
+    <body>
+        <div class="container-fluid">
+            <div class="row">
+                <ul>
+                    <li>First line ignored</li>
+                    <li>First Latitude, Second is Longitude</li>
+                    <li>Latitude and longitude are separated by space</li>
+                    <li>Limited to 250 lines for now</li>
+                    <li>Precision of float is 4 digits</li>
+                    <li>Unique points are returned</li>
+                    <li>Comma separated values are returned 'Latitude;Longitude;Elevation;Prevision'</li>
+                </ul>
+                <pre>
+                    Latitude	 Longitude
+                    4.762993	 45.809403
+                    4.762993	 45.809403
+                    4.762993	 45.809403
+                    4.762993	 45.809403
+                    4.762993	 45.809403
+                </pre>
+            </div>
+            <div class="row">
+            @helper.form(action = routes.Application.upload, 'enctype -> "multipart/form-data") {
+                <input type="file" name="inputGpsData">
 
-    @helper.form(action = routes.Application.upload, 'enctype -> "multipart/form-data") {
-
-        <input type="file" name="picture">
-
-        <p>
-            <input type="submit">
-        </p>
-
-    }
-
-}
+                <p>
+                    <input type="submit">
+                </p>
+            }
+            </div>
+        </div>
+    </body>
+</html>
