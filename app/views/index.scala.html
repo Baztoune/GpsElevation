@@ -10,7 +10,10 @@
     <link rel="stylesheet" href="@routes.Assets.at("stylesheets/main.css")">
 </head>
     <body>
-        <div class="container-fluid">
+        <div class="container">
+            <div class="jumbotron">
+                <h3>GPS elevation</h3>
+            </div>
             <div class="row">
                 <ul>
                     <li>First line ignored</li>
@@ -20,23 +23,13 @@
                     <li>Precision of float is 4 digits</li>
                     <li>Unique points are returned</li>
                     <li>Comma separated values are returned 'Latitude;Longitude;Elevation;Prevision'</li>
+                    <li>Download a <a href="@routes.Assets.at("resources/longitude_latitude.txt")">sample file</a></li>
                 </ul>
-                <pre>
-                    Latitude	 Longitude
-                    4.762993	 45.809403
-                    4.762993	 45.809403
-                    4.762993	 45.809403
-                    4.762993	 45.809403
-                    4.762993	 45.809403
-                </pre>
             </div>
             <div class="row">
             @helper.form(action = routes.Application.upload, 'enctype -> "multipart/form-data") {
                 <input type="file" name="inputGpsData">
-
-                <p>
-                    <input type="submit">
-                </p>
+                <input type="submit">
             }
             </div>
         </div>

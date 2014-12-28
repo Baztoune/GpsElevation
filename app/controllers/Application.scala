@@ -2,6 +2,7 @@ package controllers
 
 import com.google.maps.model.{EncodedPolyline, LatLng}
 import com.google.maps.{ElevationApi, GeoApiContext}
+import org.joda.time.DateTime
 import play.api.Play
 import play.api.libs.iteratee.Enumerator
 import play.api.mvc._
@@ -34,16 +35,21 @@ object Application extends Controller {
       }.toList.distinct.map({uniqueLatLngToNative(_)})
 
       // TODO loop by blocks to prevent long http queries
-      val results = ElevationApi.getByPoints(context, new EncodedPolyline(uniqueLatLngs.slice(0,250).asJava)).await()
+      /*val results = uniqueLatLngs.grouped(250).map({
+        a => ElevationApi.getByPoints(context, new EncodedPolyline(a.asJava)).await()
+      })*/
+      val results = ElevationApi.getByPoints(context, new EncodedPolyline(uniqueLatLngs.take(250).asJava)).await()
 
-      // Map and stream results
+      // Map results, init enumerator
       val resultsEnumerator = Enumerator.enumerate(results.map({
         result => s"${result.location.lat};${result.location.lng};${result.elevation};${result.resolution}\n"
       }))
 
+      // Stream results to file
+      val dateAsText = DateTime.now().toString("yyyyMMdd-HHmmss")
       Ok.chunked(resultsEnumerator.andThen(Enumerator.eof)).withHeaders(
         "Content-Type" -> "txt/plain",
-        "Content-Disposition" -> s"attachment; filename=elevation.txt"
+        "Content-Disposition" -> s"attachment; filename=elevation-${dateAsText}.txt"
       )
     }.get
   }
