@@ -2,6 +2,7 @@ package controllers
 
 import com.google.maps.model.{EncodedPolyline, LatLng}
 import com.google.maps.{ElevationApi, GeoApiContext}
+import org.joda.time.DateTime
 import play.api.Play
 import play.api.libs.iteratee.Enumerator
 import play.api.mvc._
@@ -13,45 +14,73 @@ import scala.math.BigDecimal.RoundingMode
 
 
 object Application extends Controller {
+  val SEPARATOR = " "
+  val SCALE = 4
 
   def index = Action {
-    Ok(views.html.index("Your new application is ready."))
+    Ok(views.html.index(None, None))
   }
 
   def upload = Action(parse.multipartFormData) { request =>
-    request.body.file("picture").map { picture =>
+    request.body.file("inputGpsData").map { inputGpsData =>
+
+      // Get token
       val context = new GeoApiContext().setApiKey(Play.current.configuration.getString("google.api.token").get)
 
-      val source = Source.fromFile(picture.ref.file)
+      // Parse file
+      val source = Source.fromFile(inputGpsData.ref.file)
       source.getLines().next // skip first line
-      val points = source.getLines().map {
+      val uniqueLatLngs = source.getLines().map {
         line => parseLineToLatLng(line)
-      }.toList
+      }.toList.distinct.map({uniqueLatLngToNative(_)})
 
-      val results3 = ElevationApi.getByPoints(context, new EncodedPolyline(points.slice(0, 250).asJava)).await()
+      // TODO loop by blocks to prevent long http queries
+      /*val results = uniqueLatLngs.grouped(250).map({
+        a => ElevationApi.getByPoints(context, new EncodedPolyline(a.asJava)).await()
+      })*/
+      val results = ElevationApi.getByPoints(context, new EncodedPolyline(uniqueLatLngs.take(250).asJava)).await()
 
-      val a = Enumerator.enumerate(results3.map({
-        a => s"${a.location.lat};${a.location.lng};${a.elevation};${a.resolution}\n"
+      // Map results, init enumerator
+      val resultsEnumerator = Enumerator.enumerate(results.map({
+        result => s"${result.location.lat};${result.location.lng};${result.elevation};${result.resolution}\n"
       }))
 
-      Ok.chunked(a.andThen(Enumerator.eof)).withHeaders(
+      // Stream results to file
+      val dateAsText = DateTime.now().toString("yyyyMMdd-HHmmss")
+      Ok.chunked(resultsEnumerator.andThen(Enumerator.eof)).withHeaders(
         "Content-Type" -> "txt/plain",
-        "Content-Disposition" -> s"attachment; filename=elevation.txt"
+        "Content-Disposition" -> s"attachment; filename=elevation-${dateAsText}.txt"
       )
     }.get
   }
 
-
-  def parseLineToLatLng(line: String): LatLng = {
-    val SEPARATOR = " "
-
-    val point = line.split(SEPARATOR)
-    new LatLng(parseFloat(point(0)), parseFloat(point(1)))
+  /**
+   * We need this case class to use List.distinct, otherwise it doesn't work
+   * @param lat
+   * @param lng
+   */
+  case class LatLngCaseClass(lat:Double, lng:Double)
+  def uniqueLatLngToNative(point: LatLngCaseClass): LatLng = {
+    new LatLng(point.lat,point.lng)
   }
 
-  def parseFloat(s: String): Float = {
-    val SCALE = 4
+  /**
+   * Parse the entire line and return a LatLngCaseClass point
+   * @param line
+   * @return the point
+   */
+  def parseLineToLatLng(line: String): LatLngCaseClass = {
+    val point = line.split(SEPARATOR)
+    LatLngCaseClass(parseFloat(point(0)), parseFloat(point(1)))
+  }
 
+
+  /**
+   * Parse a String to a Float, using the defined SCALE
+   * @param s
+   * @return float
+   */
+  def parseFloat(s: String): Float = {
     BigDecimal(s.trim).setScale(SCALE, RoundingMode.DOWN).floatValue()
   }
 
