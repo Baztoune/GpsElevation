@@ -4,34 +4,78 @@
 <html>
 <head>
     <title>GPS Elevation</title>
+
     <link rel="shortcut icon" href="@routes.Assets.at("images/favicon.png")" type="image/png">
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="@routes.Assets.at("images/apple-touch-icon-144x144.png")" />
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="@routes.Assets.at("images/apple-touch-icon-152x152.png")" />
+    <link rel="icon" type="image/png" href="@routes.Assets.at("images/favicon-32x32.png")" sizes="32x32" />
+    <link rel="icon" type="image/png" href="@routes.Assets.at("images/favicon-16x16.png")" sizes="16x16" />
+    <meta name="msapplication-TileImage" content="@routes.Assets.at("images/mstile-144x144.png")" />
 
     <link rel="stylesheet" href="@routes.Assets.at("lib/bootstrap/css/bootstrap.css")">
+    <link rel="stylesheet" href="@routes.Assets.at("stylesheets/jumbotron-narrow.css")" >
     <link rel="stylesheet" href="@routes.Assets.at("stylesheets/main.css")">
+
+    <script src="@routes.Assets.at("lib/jquery/jquery.min.js")"></script>
+    <script src="@routes.Assets.at("lib/bootstrap-filestyle/bootstrap-filestyle.js")"></script>
+    <script>
+    $(function(){
+        $("#file-upload").filestyle();
+        $("#file-upload").change(function(){
+            $("#file-form").submit();
+            $("#file-upload").filestyle('clear');
+        });
+    });
+    </script>
 </head>
     <body>
         <div class="container">
+            <div class="header">
+                <nav>
+                    <ul class="nav nav-pills pull-right">
+                        <li role="presentation" class="active"><a href="@routes.Application.index()">Home</a></li>
+                        <li role="presentation"><a href="#">About</a></li>
+                    </ul>
+                </nav>
+                <h3 class="text-muted">GPS Elevation</h3>
+            </div>
+
             <div class="jumbotron">
-                <h3>GPS elevation</h3>
+                <h1>Enrich your GPS data!</h1>
+                <p class="lead">Upload a file with Latitude and Longitude, and you'll receive the same file with elevation. Oh, really?</p>
+
+                @helper.form(action = routes.Application.upload, 'id -> "file-form", 'enctype -> "multipart/form-data") {
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-4 col-md-offset-4">
+                            <input id="file-upload" type="file" name="inputGpsData" class="filestyle"
+                               data-input="false" data-buttonText="Upload a file!" data-buttonName="btn-success" >
+                        </div>
+                    </div>
+                </div>
+                }
             </div>
-            <div class="row">
-                <ul>
-                    <li>First line ignored</li>
-                    <li>First Latitude, Second is Longitude</li>
-                    <li>Latitude and longitude are separated by space</li>
-                    <li>Limited to 250 lines for now</li>
-                    <li>Precision of float is 4 digits</li>
-                    <li>Unique points are returned</li>
-                    <li>Comma separated values are returned 'Latitude;Longitude;Elevation;Prevision'</li>
-                    <li>Download a <a href="@routes.Assets.at("resources/longitude_latitude.txt")">sample file</a></li>
-                </ul>
+
+            <div class="row marketing">
+                <div>
+                    <h4>Current specs</h4>
+                    <ul>
+                        <li>First line is ignored</li>
+                        <li>First column is Latitude, second is Longitude</li>
+                        <li>Latitude and longitude are separated by space</li>
+                        <li>Google Maps API has a limited number of requests</li>
+                        <li>Precision of float is 4 digits</li>
+                        <li>Unique points are returned (duplicates ignored)</li>
+                        <li>Comma separated values are returned 'Latitude;Longitude;Elevation;Prevision'</li>
+                        <li>Download a <a href="@routes.Assets.at("resources/longitude_latitude.txt")">sample file</a></li>
+                    </ul>
+                </div>
             </div>
-            <div class="row">
-            @helper.form(action = routes.Application.upload, 'enctype -> "multipart/form-data") {
-                <input type="file" name="inputGpsData">
-                <input type="submit">
-            }
-            </div>
-        </div>
+
+            <footer class="footer">
+                <p>&copy; CodeBlessYou 2014</p>
+            </footer>
+
+        </div> <!-- /container -->
     </body>
 </html>
