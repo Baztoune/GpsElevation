@@ -23,34 +23,32 @@ object Application extends Controller {
 
   def upload = Action(parse.multipartFormData) { request =>
     request.body.file("inputGpsData").map { inputGpsData =>
-
       // Get token
       val context = new GeoApiContext().setApiKey(Play.current.configuration.getString("google.api.token").get)
 
       // Parse file
       val source = Source.fromFile(inputGpsData.ref.file)
       source.getLines().next // skip first line
-      val uniqueLatLngs = source.getLines().map {
-        line => parseLineToLatLng(line)
-      }.toList.distinct.map({uniqueLatLngToNative(_)})
-
-      // TODO loop by blocks to prevent long http queries
-      /*val results = uniqueLatLngs.grouped(250).map({
-        a => ElevationApi.getByPoints(context, new EncodedPolyline(a.asJava)).await()
-      })*/
-      val results = ElevationApi.getByPoints(context, new EncodedPolyline(uniqueLatLngs.take(250).asJava)).await()
 
       // Map results, init enumerator
-      val resultsEnumerator = Enumerator.enumerate(results.map({
-        result => s"${result.location.lat};${result.location.lng};${result.elevation};${result.resolution}\n"
-      }))
+      val resultsEnumerator = Enumerator.enumerate(
+        source.getLines()
+          .map(line => parseLineToLatLng(line))                                                                       // parse
+          .toList.distinct                                                                                            // do not keep duplicates
+          .map(uniqueLatLngToNative(_))                                                                               // convert to LatLng
+          .grouped(250)                                                                                               // group http requests
+          .map(points => ElevationApi.getByPoints(context, new EncodedPolyline(points.asJava)).await())               // call API
+          .flatMap(a => a)                                                                                            // flatten iterator of arrays
+          .map(result => s"${result.location.lat};${result.location.lng};${result.elevation};${result.resolution}\n") // format result
+      )
 
       // Stream results to file
       val dateAsText = DateTime.now().toString("yyyyMMdd-HHmmss")
-      Ok.chunked(resultsEnumerator.andThen(Enumerator.eof)).withHeaders(
-        "Content-Type" -> "txt/plain",
-        "Content-Disposition" -> s"attachment; filename=elevation-${dateAsText}.txt"
-      )
+      Ok.chunked(resultsEnumerator.andThen(Enumerator.eof))
+        .withHeaders(
+          "Content-Type" -> "txt/plain",
+          "Content-Disposition" -> s"attachment; filename=elevation-${dateAsText}.txt"
+        )
     }.get
   }
 
@@ -59,9 +57,10 @@ object Application extends Controller {
    * @param lat
    * @param lng
    */
-  case class LatLngCaseClass(lat:Double, lng:Double)
+  case class LatLngCaseClass(lat: Double, lng: Double)
+
   def uniqueLatLngToNative(point: LatLngCaseClass): LatLng = {
-    new LatLng(point.lat,point.lng)
+    new LatLng(point.lat, point.lng)
   }
 
   /**
