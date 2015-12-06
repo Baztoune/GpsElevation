@@ -14,14 +14,17 @@ import scala.math.BigDecimal.RoundingMode
 
 
 object Application extends Controller {
-  val SEPARATOR = " "
-  val SCALE = 4
+  val DEFAULT_SEPARATOR = " "
+  val DEFAULT_SCALE = 4
 
   def index = Action {
-    Ok(views.html.index(None, None))
+    Ok(views.html.index())
   }
 
   def upload = Action(parse.multipartFormData) { request =>
+    val scale = request.body.dataParts.getOrElse("scale", Seq.empty).headOption.getOrElse(DEFAULT_SCALE.toString).toInt
+    val dateAsText = DateTime.now().toString("yyyyMMdd-HH'h'mm'm'ss's'")
+
     request.body.file("inputGpsData").map { inputGpsData =>
       // Get token
       val context = new GeoApiContext().setApiKey(Play.current.configuration.getString("google.api.token").get)
@@ -33,29 +36,25 @@ object Application extends Controller {
       // Map results, init enumerator
       val resultsEnumerator = Enumerator.enumerate(
         source.getLines()
-          .map(line => parseLineToLatLng(line))                                                                       // parse
+          .map(parseLineToLatLng(_, scale))                                                                           // parse
           .toList.distinct                                                                                            // do not keep duplicates
-          .map(uniqueLatLngToNative(_))                                                                               // convert to LatLng
+          .map(uniqueLatLngToNative)                                                                                  // convert to LatLng
           .grouped(250)                                                                                               // group http requests
-          .map(points => ElevationApi.getByPoints(context, new EncodedPolyline(points.asJava)).await())               // call API
-          .flatMap(a => a)                                                                                            // flatten iterator of arrays
+          .flatMap(points => ElevationApi.getByPoints(context, new EncodedPolyline(points.asJava)).await())           // call API
           .map(result => s"${result.location.lat};${result.location.lng};${result.elevation};${result.resolution}\n") // format result
       )
 
       // Stream results to file
-      val dateAsText = DateTime.now().toString("yyyyMMdd-HHmmss")
       Ok.chunked(resultsEnumerator.andThen(Enumerator.eof))
         .withHeaders(
           "Content-Type" -> "txt/plain",
-          "Content-Disposition" -> s"attachment; filename=elevation-${dateAsText}.txt"
+          "Content-Disposition" -> s"attachment; filename=elevation-$dateAsText-precision$scale.txt"
         )
     }.get
   }
 
   /**
    * We need this case class to use List.distinct, otherwise it doesn't work
-   * @param lat
-   * @param lng
    */
   case class LatLngCaseClass(lat: Double, lng: Double)
 
@@ -68,9 +67,9 @@ object Application extends Controller {
    * @param line
    * @return the point
    */
-  def parseLineToLatLng(line: String): LatLngCaseClass = {
-    val point = line.split(SEPARATOR)
-    LatLngCaseClass(parseFloat(point(0)), parseFloat(point(1)))
+  def parseLineToLatLng(line: String, scale:Int): LatLngCaseClass = {
+    val geoPoint = line.split(DEFAULT_SEPARATOR)
+    LatLngCaseClass(parseDouble(geoPoint(0), scale), parseDouble(geoPoint(1), scale))
   }
 
 
@@ -79,8 +78,8 @@ object Application extends Controller {
    * @param s
    * @return float
    */
-  def parseFloat(s: String): Float = {
-    BigDecimal(s.trim).setScale(SCALE, RoundingMode.DOWN).floatValue()
+  def parseDouble(s: String, scale: Int): Double = {
+    BigDecimal(s.trim).setScale(scale, RoundingMode.HALF_DOWN).rounded.doubleValue()
   }
 
 }
